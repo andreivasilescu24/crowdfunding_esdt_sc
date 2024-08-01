@@ -1,0 +1,37 @@
+init:
+    User -> deploy(deadline <= curr_time) -> FAIL
+    User -> deploy(target <= 0) -> FAIL
+    User -> deploy(invalid token id) -> FAIL
+    User -> deploy (deadline > curr_time, target > 0, tokenId ok (2 cases - EGLD/another token)) -> PASS
+    User -> deploy (NFT id) -> FAIL (Should be an esdt/egld)
+
+fund:
+    User -> fund after deadline -> FAIL
+    User -> fund with wrong token id -> FAIL
+    User -> fund(before deadline, sent tokenId == tokenId set by the owner) -> PASS
+
+claim:
+    User -> claim before deadline -> FAIL
+    Target achieved -> User (not owner) -> claim -> FAIL
+    Target not achieved -> User (no previous deposit) -> claim -> FAIL
+                        -> User (already claimed funds) -> claim -> FAIL
+    Target Achieved, Deadline passed -> Owner -> claim -> PASS
+    Target not achieved -> User -> claim -> PASS
+
+getCurrentFunds:
+    Query balance (getCurrentFunds) (expected 0) -> 2 Funds (1 EGLD each) -> Query balance (expected 2)
+    
+getDeposit:
+    User funds -> Query deposit -> expected result: funds he previously added
+
+Other:
+    User -> fund (call_value = 0) -> claim -> FAIL
+    User -> fund (NFT instead EGLD/ESDT) -> FAIL
+    Owner -> fund -> claim (Target not achieved - Status failed) -> PASS
+    User -> fund -> claim (Target not achieved - Status failed) -> PASS
+
+
+
+
+
+
