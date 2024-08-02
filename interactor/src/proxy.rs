@@ -72,6 +72,35 @@ where
     To: TxTo<Env>,
     Gas: TxGas<Env>,
 {
+    pub fn upgrade<
+        Arg0: ProxyArg<BigUint<Env::Api>>,
+        Arg1: ProxyArg<u64>,
+        Arg2: ProxyArg<EgldOrEsdtTokenIdentifier<Env::Api>>,
+    >(
+        self,
+        target: Arg0,
+        deadline: Arg1,
+        token_identifier: Arg2,
+    ) -> TxTypedUpgrade<Env, From, To, NotPayable, Gas, ()> {
+        self.wrapped_tx
+            .payment(NotPayable)
+            .raw_upgrade()
+            .argument(&target)
+            .argument(&deadline)
+            .argument(&token_identifier)
+            .original_result()
+    }
+}
+
+#[rustfmt::skip]
+impl<Env, From, To, Gas> CrowdfundingProxyMethods<Env, From, To, Gas>
+where
+    Env: TxEnv,
+    Env::Api: VMApi,
+    From: TxFrom<Env>,
+    To: TxTo<Env>,
+    Gas: TxGas<Env>,
+{
     pub fn fund(
         self,
     ) -> TxTypedCall<Env, From, To, (), Gas, ()> {
