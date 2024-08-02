@@ -1,10 +1,12 @@
 #![allow(non_snake_case)]
+#![allow(dead_code)]
 
 mod proxy;
 
 use crowdfunding_esdt::endpoints::target;
 use multiversx_sc_snippets::imports::*;
 use multiversx_sc_snippets::sdk;
+use multiversx_sc_snippets::sdk::data::address;
 use serde::{Deserialize, Serialize};
 use std::{
     io::{Read, Write},
@@ -79,6 +81,7 @@ impl Drop for State {
 struct ContractInteract {
     interactor: Interactor,
     wallet_address: Address,
+    user_address: Address,
     contract_code: BytesValue,
     state: State,
 }
@@ -87,6 +90,7 @@ impl ContractInteract {
     async fn new() -> Self {
         let mut interactor = Interactor::new(GATEWAY).await;
         let wallet_address = interactor.register_wallet(test_wallets::alice());
+        let user_address = interactor.register_wallet(test_wallets::bob());
 
         let contract_code = BytesValue::interpret_from(
             "mxsc:../output/crowdfunding-esdt.mxsc.json",
@@ -96,6 +100,7 @@ impl ContractInteract {
         ContractInteract {
             interactor,
             wallet_address,
+            user_address,
             contract_code,
             state: State::load_state(),
         }
@@ -125,23 +130,24 @@ impl ContractInteract {
         println!("new address: {new_address_bech32}");
     }
 
-    async fn fund(&mut self) {
-        let token_id = String::new();
-        let token_nonce = 0u64;
-        let token_amount = BigUint::<StaticApi>::from(0u128);
+    async fn fund(&mut self, token_id: &str, token_nonce: u64, token_amount: u128) {
+        // let token_id = String::new();
+        // let token_nonce = 0u64;
+        // let token_amount = BigUint::<StaticApi>::from(0u128);
 
         let response = self
             .interactor
             .tx()
             .from(&self.wallet_address)
             .to(self.state.current_address())
+            // .egld(100000000000000000)
             .gas(NumExpr("30,000,000"))
             .typed(proxy::CrowdfundingProxy)
             .fund()
             .payment((
-                TokenIdentifier::from(token_id.as_str()),
+                TokenIdentifier::from(token_id),
                 token_nonce,
-                token_amount,
+                BigUint::<StaticApi>::from(token_amount),
             ))
             .returns(ReturnsResultUnmanaged)
             .prepare_async()
@@ -288,6 +294,52 @@ impl ContractInteract {
 
         // println!("new address: {new_address_bech32}");
     }
+
+    async fn claim_fail(&mut self, expected_result: ExpectError<'_>, sender_address: &Address) {
+        self.interactor
+            .tx()
+            .from(sender_address)
+            .to(self.state.current_address())
+            .gas(NumExpr("30,000,000"))
+            .typed(proxy::CrowdfundingProxy)
+            .claim()
+            .returns(expected_result)
+            .prepare_async()
+            .run()
+            .await;
+    }
+
+    async fn get_deadline(&mut self) -> u64 {
+        let result_value = self
+            .interactor
+            .query()
+            .to(self.state.current_address())
+            .typed(proxy::CrowdfundingProxy)
+            .deadline()
+            .returns(ReturnsResultUnmanaged)
+            .prepare_async()
+            .run()
+            .await;
+
+        println!("Result: {result_value:?}");
+        result_value
+    }
+
+    async fn get_target(&mut self) -> BigUint<StaticApi> {
+        let result_value = self
+            .interactor
+            .query()
+            .to(self.state.current_address())
+            .typed(proxy::CrowdfundingProxy)
+            .target()
+            .returns(ReturnsResultUnmanaged)
+            .prepare_async()
+            .run()
+            .await;
+
+        println!("Result: {result_value:?}");
+        BigUint::from(result_value)
+    }
 }
 
 #[tokio::test]
@@ -299,6 +351,17 @@ async fn test_deploy() {
     interact.deploy(target, deadline, token_identifier).await;
 }
 
+#[tokio::test]
+async fn test_claim_fail() {
+    let mut interact = ContractInteract::new().await;
+    let owner_address = &interact.wallet_address;
+    let user_address = &interact.user_address;
+
+    interact.fund()
+}
+
+#[tokio::test]
+async fn test_claim_fail() {}
 // #[tokio::test]
 // async fn test_deploy_bad_parameters() {
 //     let mut interact = ContractInteract::new().await;
