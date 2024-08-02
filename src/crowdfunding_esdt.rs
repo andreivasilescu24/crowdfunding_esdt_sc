@@ -28,6 +28,11 @@ pub trait Crowdfunding {
         self.cf_token_identifier().set(token_identifier);
     }
 
+    #[upgrade]
+    fn upgrade(&self, target: BigUint, deadline: u64, token_identifier: EgldOrEsdtTokenIdentifier) {
+        self.init(target, deadline, token_identifier);
+    }
+
     #[endpoint]
     #[payable("*")]
     fn fund(&self) {

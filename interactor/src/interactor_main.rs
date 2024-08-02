@@ -79,6 +79,7 @@ impl Drop for State {
 struct ContractInteract {
     interactor: Interactor,
     wallet_address: Address,
+    user_address: Address,
     contract_code: BytesValue,
     state: State,
 }
@@ -86,7 +87,8 @@ struct ContractInteract {
 impl ContractInteract {
     async fn new() -> Self {
         let mut interactor = Interactor::new(GATEWAY).await;
-        let wallet_address = interactor.register_wallet(test_wallets::alice());
+        let wallet_address = interactor.register_wallet(test_wallets::alice());         //////////////////////
+        let user_address = interactor.register_wallet(test_wallets::bob()); 
 
         let contract_code = BytesValue::interpret_from(
             "mxsc:../output/crowdfunding-esdt.mxsc.json",
@@ -96,6 +98,7 @@ impl ContractInteract {
         ContractInteract {
             interactor,
             wallet_address,
+            user_address,
             contract_code,
             state: State::load_state(),
         }
@@ -125,23 +128,69 @@ impl ContractInteract {
         println!("new address: {new_address_bech32}");
     }
 
-    async fn fund(&mut self) {
-        let token_id = String::new();
-        let token_nonce = 0u64;
-        let token_amount = BigUint::<StaticApi>::from(0u128);
+    async fn upgrade(&mut self, target: u128, deadline: u64, token_identifier: &str) {
+        // let target = BigUint::<StaticApi>::from(target);
+        // let token_identifier = EgldOrEsdtTokenIdentifier::esdt(token_identifier);
 
-        let response = self
+         self
             .interactor
             .tx()
             .from(&self.wallet_address)
             .to(self.state.current_address())
             .gas(NumExpr("30,000,000"))
             .typed(proxy::CrowdfundingProxy)
+            .upgrade(BigUint::from(target), deadline, TokenIdentifier::from(token_identifier))
+            .code(&self.contract_code)
+            .code_metadata(CodeMetadata::UPGRADEABLE)
+            .prepare_async()
+            .run()
+            .await;
+
+        println!("upgrade completed");
+    }
+
+    async fn fund_egld(&mut self, token_amount: u128) {  ////////////
+        // let token_id = String::new();
+        // let token_nonce = 0u64;
+        // let token_amount = BigUint::<StaticApi>::from(0u128);
+
+        let response = self
+            .interactor
+            .tx()
+            .from(&self.wallet_address) 
+            .to(self.state.current_address())
+            .gas(NumExpr("30,000,000"))
+            .typed(proxy::CrowdfundingProxy)
+            .fund()
+            .egld(
+                BigUint::from(token_amount),
+            )
+            .returns(ReturnsResultUnmanaged)
+            .prepare_async()
+            .run()
+            .await;
+
+        println!("Result: {response:?}");
+    }
+
+
+    async fn fund(&mut self, token_id: &str, token_nonce: u64, token_amount: u128) {  ////////////
+        // let token_id = String::new();
+        // let token_nonce = 0u64;
+        // let token_amount = BigUint::<StaticApi>::from(0u128);
+
+        let response = self
+            .interactor
+            .tx()
+            .from(&self.wallet_address) 
+            .to(self.state.current_address())
+            .gas(NumExpr("30,000,000"))
+            .typed(proxy::CrowdfundingProxy)
             .fund()
             .payment((
-                TokenIdentifier::from(token_id.as_str()),
+                TokenIdentifier::from(token_id),
                 token_nonce,
-                token_amount,
+                BigUint::from(token_amount),
             ))
             .returns(ReturnsResultUnmanaged)
             .prepare_async()
@@ -306,8 +355,8 @@ async fn test_deploy() {
 //     let target_pass = BigUint::<StaticApi>::from(5u128);
 //     let deadline_fail = 1722516628u64;
 //     let deadline_pass = 1822516628u64;
-//     let token_id_pass = TokenIdentifier::from_esdt_bytes(&b"EGLD-123456"[..]);
-//     let token_id_incorrect = TokenIdentifier::from("ESVT-1234566653");
+//     let token_id_pass = "EGLD-123456";
+//     //let token_id_incorrect = TokenIdentifier::from("ESVT-1234566653");
 //     // let token_id_nft = TokenIdentifier::from_esdt_bytes(&b"TEST-123456-01"[..]);
 //     interact
 //         .deploy_bad_parameters(
@@ -318,3 +367,31 @@ async fn test_deploy() {
 //         )
 //         .await;
 // }
+
+#[tokio::test]
+async fn test_fund_pass() {
+    let mut interact = ContractInteract::new().await;
+    // let token_id = String::new();
+    // let token_nonce = 0u64;
+    // let token_amount = BigUint::<StaticApi>::from(0u128);
+   
+    let token_id1 = "EGLD";
+    let token_id2 = "BSK-476470";
+    let token_nonce = 0u64;
+    let token_amount = 500000000000000000u128;
+    // interact
+    // .fund_egld(
+    //     token_amount
+    // )
+    // .await;
+    let target = 5u128;
+    let deadline = 1732516628u64;
+
+
+    interact.upgrade(target, deadline, token_id2).await;
+
+    interact.fund(token_id2, token_nonce, token_amount).await;
+
+    assert_eq!(1, 1)
+
+}
