@@ -6,32 +6,25 @@ init:
     User -> deploy (NFT id) -> FAIL (Should be an esdt/egld)
 
 fund:
-    User -> fund after deadline -> FAIL
-    User -> fund with wrong token id -> FAIL
-    User -> fund(before deadline, sent tokenId == tokenId set by the owner) -> PASS
+    User -> fund after deadline -> FAIL --------------------- TUDOR
+    User -> fund with wrong token id -> FAIL --------------------- TUDOR
+    User -> fund(before deadline, sent tokenId == tokenId set by the owner) -> PASS --------------------- TUDOR
 
 claim:
-    User -> claim before deadline -> FAIL
-    Target achieved -> User (not owner) -> claim -> FAIL
-    Target not achieved -> User (no previous deposit) -> claim -> FAIL
-                        -> User (already claimed funds) -> claim -> FAIL
-    Target Achieved, Deadline passed -> Owner -> claim -> PASS
-    Target not achieved -> User -> claim -> PASS
+    User -> claim before deadline -> FAIL -------------- ANDREI
+    Target achieved -> User (not owner) -> claim -> FAIL ------------------- ANDREI
+    Target not achieved -> User (no previous deposit) -> claim -> FAIL --------------------- ALEXANDRA
+                        -> User (already claimed funds) -> claim -> FAIL ------------- ANDREI
+    Target Achieved, Deadline passed -> Owner -> claim -> PASS ---------------------- ANDREI
+    Target not achieved -> User -> claim -> PASS ---------------------------- ANDREI
 
 getCurrentFunds:
-    Query balance (getCurrentFunds) (expected 0) -> 2 Funds (1 EGLD each) -> Query balance (expected 2)
+    Query balance (getCurrentFunds) (expected 0) -> 2 Funds (1 EGLD each) -> Query balance (expected 2) ----------- ALEXANDRA
     
 getDeposit:
-    User funds -> Query deposit -> expected result: funds he previously added
+    User funds -> Query deposit -> expected result: funds he previously added -------------- ALEXANDRA
 
 Other:
-    User -> fund (call_value = 0) -> claim -> FAIL
-    User -> fund (NFT instead EGLD/ESDT) -> FAIL
     Owner -> fund -> claim (Target not achieved - Status failed) -> PASS
     User -> fund -> claim (Target not achieved - Status failed) -> PASS
-
-
-
-
-
-
+    
