@@ -30,6 +30,17 @@ enum AddressType {
     Frank,
 }
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
+const TOKEN_ID_EGLD: &str = "EGLD";
+const TOKEN_ID_TTO: &str = "TTO-281def";
+const TOKEN_ID_WRONG_TOKEN: &str = "BSK-476470";
+const TOKEN_NONCE: u64 = 0;
+const TOKEN_AMOUNT: u128 = 500000000000000000;
+const TARGET: u128 = 5;
+const DEADLINE: u64 = 1732516628;
+const PAST_DEADLINE: u64 = 1722597975;
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -50,6 +61,13 @@ async fn main() {
     //     "getCrowdfundingTokenIdentifier" => interact.cf_token_identifier().await,
     //     _ => panic!("unknown command: {}", &cmd),
     // }
+    let start = SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    let unix_timestamp = since_the_epoch.as_secs();
+
+    println!("Current Unix timestamp: {}", unix_timestamp);
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -177,11 +195,6 @@ impl ContractInteract {
     }
 
     async fn fund_egld(&mut self, token_amount: u128) {
-        ////////////
-        // let token_id = String::new();
-        // let token_nonce = 0u64;
-        // let token_amount = BigUint::<StaticApi>::from(0u128);
-
         let response = self
             .interactor
             .tx()
@@ -216,7 +229,6 @@ impl ContractInteract {
             .tx()
             .from(sender_addr)
             .to(self.state.current_address())
-            // .egld(100000000000000000)
             .gas(NumExpr("30,000,000"))
             .typed(proxy::CrowdfundingProxy)
             .fund()
@@ -233,16 +245,38 @@ impl ContractInteract {
         println!("Result: {response:?}");
     }
 
-    async fn fundDan(&mut self, token_id: &str, token_nonce: u64, token_amount: u128) {
+    async fn fund_egld_failed(&mut self, token_amount: u128, expected_result: ExpectError<'_>) {
         ////////////
-        // let token_id = String::new();
-        // let token_nonce = 0u64;
-        // let token_amount = BigUint::<StaticApi>::from(0u128);
 
         let response = self
             .interactor
             .tx()
-            .from(&self.dan_address)
+            .from(&self.owner_address)
+            .to(self.state.current_address())
+            .gas(NumExpr("30,000,000"))
+            .typed(proxy::CrowdfundingProxy)
+            .fund()
+            .egld(BigUint::from(token_amount))
+            .returns(expected_result)
+            .prepare_async()
+            .run()
+            .await;
+
+        println!("Result: {response:?}");
+    }
+
+    async fn fund_failed(
+        &mut self,
+        token_id: &str,
+        token_nonce: u64,
+        token_amount: u128,
+        expected_result: ExpectError<'_>,
+    ) {
+        ////////////
+        let response = self
+            .interactor
+            .tx()
+            .from(&self.owner_address)
             .to(self.state.current_address())
             .gas(NumExpr("30,000,000"))
             .typed(proxy::CrowdfundingProxy)
@@ -252,12 +286,12 @@ impl ContractInteract {
                 token_nonce,
                 BigUint::from(token_amount),
             ))
-            .returns(ReturnsResultUnmanaged)
+            .returns(expected_result)
             .prepare_async()
             .run()
             .await;
 
-        println!("FUNDBOB Result: {response:?}");
+        println!("Result: {response:?}");
     }
 
     async fn status(&mut self) {
@@ -648,30 +682,10 @@ async fn test_get_deposit() {
     interact.get_deposit().await;
 }
 
-// #[tokio::test]
-// async fn test_deploy_bad_parameters() {
-//     let mut interact = ContractInteract::new().await;
-//     let target_fail = BigUint::<StaticApi>::from(0u128);
-//     let target_pass = BigUint::<StaticApi>::from(5u128);
-//     let deadline_fail = 1722516628u64;
-//     let deadline_pass = 1822516628u64;
-//     let token_id_pass = "EGLD-123456";
-//     //let token_id_incorrect = TokenIdentifier::from("ESVT-1234566653");
-//     // let token_id_nft = TokenIdentifier::from_esdt_bytes(&b"TEST-123456-01"[..]);
-//     interact
-//         .deploy_bad_parameters(
-//             target_fail,
-//             deadline_pass,
-//             token_id_pass,
-//             ExpectError(4, "Target must be more than 0"),
-//         )
-//         .await;
-// }
-
+// DEPLOY TEST
 #[tokio::test]
-async fn test_fund_pass() {
+async fn test_deploy_egld() {
     let mut interact = ContractInteract::new().await;
-
     let token_nonce = 0u64;
     let token_amount = 500000000000000000u128;
 
@@ -684,6 +698,71 @@ async fn test_fund_pass() {
             token_nonce,
             token_amount,
             AddressType::Dan,
+        )
+        .await;
+
+    interact
+        .deploy(target, get_unix_timestamp() + 10, TOKEN_ID_EGLD)
+        .await;
+}
+
+#[tokio::test]
+async fn test_deploy_token() {
+    let mut interact = ContractInteract::new().await;
+    let target = 5u128;
+    interact
+        .deploy(target, get_unix_timestamp() + 10, TOKEN_ID_TTO)
+        .await;
+}
+
+// FUND EGLD TESTS
+#[tokio::test]
+async fn fund_egld() {
+    let mut interact = ContractInteract::new().await;
+
+    interact.upgrade(TARGET, DEADLINE, TOKEN_ID_EGLD).await;
+    interact.fund_egld(TOKEN_AMOUNT).await;
+}
+
+#[tokio::test]
+async fn fund_egld_wrong_token() {
+    let mut interact = ContractInteract::new().await;
+
+    interact.upgrade(TARGET, DEADLINE, TOKEN_ID_TTO).await;
+    interact
+        .fund_egld_failed(TOKEN_AMOUNT, ExpectError(4, "wrong token"))
+        .await;
+}
+
+#[tokio::test]
+async fn fund_egld_past_deadline() {
+    let mut interact = ContractInteract::new().await;
+    interact
+        .fund_egld_failed(TOKEN_AMOUNT, ExpectError(4, "cannot fund after deadline"))
+        .await;
+}
+
+// FUND ESDTs TESTS
+#[tokio::test]
+async fn fund_token() {
+    let mut interact = ContractInteract::new().await;
+
+    interact.upgrade(TARGET, DEADLINE, TOKEN_ID_TTO).await;
+    interact
+        .fund(TOKEN_ID_TTO, TOKEN_NONCE, TOKEN_AMOUNT, AddressType::Dan)
+        .await;
+}
+
+#[tokio::test]
+async fn fund_wrong_token() {
+    let mut interact = ContractInteract::new().await;
+
+    interact
+        .fund_failed(
+            TOKEN_ID_WRONG_TOKEN,
+            TOKEN_NONCE,
+            TOKEN_AMOUNT,
+            ExpectError(4, "wrong token"),
         )
         .await;
 }
@@ -751,11 +830,15 @@ async fn test_query_deposit() {
     let deposited_amount_before = interact.depositDan().await;
 
     // Bob funds
-    let token_identifier: &str = "TTO-281def";
     let token_nonce = 0u64;
     let token_amount = 500000000000000000u128;
     interact
-        .fundDan(token_identifier, token_nonce, token_amount)
+        .fund(
+            TOKEN_IDENTIFIER,
+            token_nonce,
+            token_amount,
+            AddressType::Dan,
+        )
         .await;
 
     //Sum Dan
@@ -768,4 +851,27 @@ async fn test_query_deposit() {
         "Deposited amount should be {:?}",
         token_amount
     );
+}
+
+#[tokio::test]
+async fn fund_token_past_deadline() {
+    let mut interact = ContractInteract::new().await;
+    interact
+        .fund_failed(
+            TOKEN_ID_TTO,
+            TOKEN_NONCE,
+            TOKEN_AMOUNT,
+            ExpectError(4, "cannot fund after deadline"),
+        )
+        .await;
+}
+
+// OTHER TESTS
+
+#[tokio::test]
+async fn fund_nft() {
+    let mut interact = ContractInteract::new().await;
+    interact
+        .fund(TOKEN_ID_TTO, 1, TOKEN_AMOUNT, AddressType::Dan)
+        .await;
 }
