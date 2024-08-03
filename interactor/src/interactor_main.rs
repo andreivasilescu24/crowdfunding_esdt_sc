@@ -104,6 +104,7 @@ struct ContractInteract {
 impl ContractInteract {
     async fn new() -> Self {
         let mut interactor = Interactor::new(GATEWAY).await;
+
         let owner_address = interactor.register_wallet(test_wallets::alice());
         let dan_address = interactor.register_wallet(test_wallets::dan());
         let frank_address = interactor.register_wallet(test_wallets::frank());
@@ -232,6 +233,33 @@ impl ContractInteract {
         println!("Result: {response:?}");
     }
 
+    async fn fundDan(&mut self, token_id: &str, token_nonce: u64, token_amount: u128) {
+        ////////////
+        // let token_id = String::new();
+        // let token_nonce = 0u64;
+        // let token_amount = BigUint::<StaticApi>::from(0u128);
+
+        let response = self
+            .interactor
+            .tx()
+            .from(&self.dan_address)
+            .to(self.state.current_address())
+            .gas(NumExpr("30,000,000"))
+            .typed(proxy::CrowdfundingProxy)
+            .fund()
+            .payment((
+                TokenIdentifier::from(token_id),
+                token_nonce,
+                BigUint::from(token_amount),
+            ))
+            .returns(ReturnsResultUnmanaged)
+            .prepare_async()
+            .run()
+            .await;
+
+        println!("FUNDBOB Result: {response:?}");
+    }
+
     async fn status(&mut self) {
         let result_value = self
             .interactor
@@ -247,7 +275,7 @@ impl ContractInteract {
         println!("Result: {result_value:?}");
     }
 
-    async fn get_current_funds(&mut self) {
+    async fn get_current_funds(&mut self) -> BigUint<StaticApi> {
         let result_value = self
             .interactor
             .query()
@@ -260,6 +288,7 @@ impl ContractInteract {
             .await;
 
         println!("Result: {result_value:?}");
+        BigUint::from(result_value)
     }
 
     async fn claim(&mut self, address_type: AddressType) {
@@ -329,6 +358,22 @@ impl ContractInteract {
             .await;
 
         println!("Result: {result_value:?}");
+    }
+
+    async fn depositDan(&mut self) -> BigUint<StaticApi> {
+        let result_value = self
+            .interactor
+            .query()
+            .to(self.state.current_address())
+            .typed(proxy::CrowdfundingProxy)
+            .deposit(&self.dan_address)
+            .returns(ReturnsResultUnmanaged)
+            .prepare_async()
+            .run()
+            .await;
+
+        println!("Result: {result_value:?}");
+        BigUint::from(result_value)
     }
 
     async fn cf_token_identifier(&mut self) {
@@ -626,17 +671,101 @@ async fn test_get_deposit() {
 #[tokio::test]
 async fn test_fund_pass() {
     let mut interact = ContractInteract::new().await;
-    // let token_id1 = "EGLD";
-    let token_id2 = "BSK-476470";
+
     let token_nonce = 0u64;
     let token_amount = 500000000000000000u128;
 
     let target = 5u128;
     let deadline = 1732516628u64;
-    interact.upgrade(target, deadline, token_id2).await;
+    interact.upgrade(target, deadline, TOKEN_IDENTIFIER).await;
     interact
-        .fund(token_id2, token_nonce, token_amount, AddressType::Dan)
+        .fund(
+            TOKEN_IDENTIFIER,
+            token_nonce,
+            token_amount,
+            AddressType::Dan,
+        )
+        .await;
+}
+
+#[tokio::test]
+async fn test_query_balance() {
+    let mut interact = ContractInteract::new().await;
+
+    // Deploy
+    let deadline = 1732516628u64;
+    let token_identifier: &str = "TTO-281def";
+    interact
+        .deploy(TARGET_CONTRACT, deadline, token_identifier)
         .await;
 
-    assert_eq!(1, 1)
+    // Check balance 0
+    let initial_balance = interact.get_current_funds().await;
+    println!("Initial balance: {:?}", initial_balance);
+    assert_eq!(
+        initial_balance,
+        BigUint::zero(),
+        "Initial balance should be 0"
+    );
+
+    // 2 funds
+    let token_nonce = 0u64;
+    let token_amount1 = 500000000000000000u128;
+    let token_amount2 = 600000000000000000u128;
+    interact
+        .fund(
+            token_identifier,
+            token_nonce,
+            token_amount1,
+            AddressType::Dan,
+        )
+        .await;
+
+    interact
+        .fund(
+            token_identifier,
+            token_nonce,
+            token_amount2,
+            AddressType::Dan,
+        )
+        .await;
+
+    // Check updated balance
+    let final_balance = interact.get_current_funds().await;
+    let expected_balance = token_amount1 + token_amount2;
+    println!("Final balance: {:?}", final_balance);
+    println!("Final balance should be {}", expected_balance);
+
+    assert_eq!(
+        final_balance,
+        BigUint::from(expected_balance),
+        "Balance amount should be {}",
+        expected_balance
+    );
+}
+
+#[tokio::test]
+async fn test_query_deposit() {
+    let mut interact = ContractInteract::new().await;
+
+    let deposited_amount_before = interact.depositDan().await;
+
+    // Bob funds
+    let token_identifier: &str = "TTO-281def";
+    let token_nonce = 0u64;
+    let token_amount = 500000000000000000u128;
+    interact
+        .fundDan(token_identifier, token_nonce, token_amount)
+        .await;
+
+    //Sum Dan
+    let deposited_amount = interact.depositDan().await;
+
+    //dep amount = dep am before + token amount
+    assert_eq!(
+        deposited_amount,
+        BigUint::from(token_amount).add(deposited_amount_before),
+        "Deposited amount should be {:?}",
+        token_amount
+    );
 }
