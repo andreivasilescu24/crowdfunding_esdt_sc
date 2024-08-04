@@ -1,0 +1,84 @@
+{
+    "steps": [
+        {
+            "step": "setState",
+            "newAddresses": [
+                {
+                    "creatorAddress": "address:owner",
+                    "creatorNonce": "0",
+                    "newAddress": "sc:crowdfunding-esdt"
+                }
+            ]
+        },
+        {
+            "step": "scDeploy",
+            "id": "",
+            "tx": {
+                "from": "address:owner",
+                "contractCode": "mxsc:output/crowdfunding-esdt.mxsc.json",
+                "arguments": [
+                    "0x64",
+                    "0x67441b14",
+                    "0x54544f2d323831646566"
+                ],
+                "gasLimit": "5,000,000"
+            },
+            "expect": {
+                "out": [],
+                "status": "0"
+            }
+        },
+        {
+            "step": "scCall",
+            "id": "",
+            "tx": {
+                "from": "address:user-1",
+                "to": "sc:crowdfunding-esdt",
+                "esdtValue": [
+                    {
+                        "tokenIdentifier": "0x54544f2d323831646566",
+                        "value": "23"
+                    }
+                ],
+                "function": "fund",
+                "arguments": [],
+                "gasLimit": "30,000,000"
+            },
+            "expect": {
+                "out": [],
+                "status": "0"
+            }
+        },
+        {
+            "step": "scQuery",
+            "id": "",
+            "tx": {
+                "to": "sc:crowdfunding-esdt",
+                "function": "getDeposit",
+                "arguments": [
+                    "0x757365722d315f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f"
+                ]
+            },
+            "expect": {
+                "out": [
+                    "0x17"
+                ],
+                "status": "0"
+            }
+        },
+        {
+            "step": "checkState",
+            "accounts": {
+                "address:user-1": {
+                    "esdt": {
+                        "str:TTO-281def": "77",
+                        "+": ""
+                    },
+                    "storage": "*",
+                    "code": "*",
+                    "owner": "*"
+                }
+            }
+        }
+    ]
+}
