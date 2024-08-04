@@ -279,7 +279,6 @@ fn test_claim_before_deadline() {
 
     deploy(&mut world);
 
-    // fund to reach target (target = 100)
     fund(&mut world, USER_1_ADDRESS, 20);
     fund(&mut world, USER_2_ADDRESS, 30);
     

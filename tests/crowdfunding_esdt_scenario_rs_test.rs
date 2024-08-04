@@ -90,3 +90,27 @@ fn egld_crowdfunding_fund_too_late_rs() {
 fn egld_crowdfunding_init_rs() {
     world().run("scenarios/egld-crowdfunding-init.scen.json");
 }
+#[test]
+fn trace_0() {
+    world().run("scenarios/trace_0.scen.json");
+}
+#[test]
+fn trace_1() {
+    world().run("scenarios/trace_1.scen.json");
+}
+#[test]
+fn trace_2() {
+    world().run("scenarios/trace_2.scen.json");
+}
+#[test]
+fn trace_3() {
+    world().run("scenarios/trace_3.scen.json");
+}
+#[test]
+fn trace_4() {
+    world().run("scenarios/trace_4.scen.json");
+}
+#[test]
+fn trace_5() {
+    world().run("scenarios/trace_5.scen.json");
+}
