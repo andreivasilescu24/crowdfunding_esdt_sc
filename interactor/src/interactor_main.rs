@@ -3,10 +3,12 @@
 
 mod proxy;
 
+use crowdfunding_esdt::endpoints::status;
 use crowdfunding_esdt::endpoints::target;
 use multiversx_sc_snippets::imports::*;
 use multiversx_sc_snippets::sdk;
 use multiversx_sc_snippets::sdk::data::address;
+use serde::de;
 use serde::{Deserialize, Serialize};
 use std::os::unix;
 use std::{
@@ -294,21 +296,6 @@ impl ContractInteract {
         println!("Result: {response:?}");
     }
 
-    async fn status(&mut self) {
-        let result_value = self
-            .interactor
-            .query()
-            .to(self.state.current_address())
-            .typed(proxy::CrowdfundingProxy)
-            .status()
-            .returns(ReturnsResultUnmanaged)
-            .prepare_async()
-            .run()
-            .await;
-
-        println!("Result: {result_value:?}");
-    }
-
     async fn get_current_funds(&mut self) -> BigUint<StaticApi> {
         let result_value = self
             .interactor
@@ -518,13 +505,29 @@ impl ContractInteract {
             .query()
             .to(self.state.current_address())
             .typed(proxy::CrowdfundingProxy)
-            .deposit(&self.dan_address)
+            .deposit(&self.frank_address)
             .returns(ReturnsResultUnmanaged)
             .prepare_async()
             .run()
             .await;
 
         println!("Result: {result_value:?}");
+    }
+
+    async fn status(&mut self) -> proxy::Status {
+        let result_value = self
+            .interactor
+            .query()
+            .to(self.state.current_address())
+            .typed(proxy::CrowdfundingProxy)
+            .status()
+            .returns(ReturnsResultUnmanaged)
+            .prepare_async()
+            .run()
+            .await;
+
+        println!("Result: {result_value:?}");
+        result_value
     }
 }
 
@@ -535,10 +538,6 @@ fn get_unix_timestamp() -> u64 {
         .expect("Time went backwards");
     let unix_timestamp = since_the_epoch.as_secs();
     unix_timestamp
-}
-
-fn calculate_reachable_deadline() -> u64 {
-    get_unix_timestamp() + 25
 }
 
 fn wait_past_deadline(deadline: u64) {
@@ -564,7 +563,7 @@ async fn test_claim_deadline_fail() {
         .upgrade(TARGET_CONTRACT, DEADLINE_CONTRACT, TOKEN_IDENTIFIER)
         .await;
     interact
-        .fund(TOKEN_IDENTIFIER, 0, 1000000000000000000, AddressType::Dan)
+        .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Dan)
         .await;
 
     interact
@@ -579,7 +578,7 @@ async fn test_claim_deadline_fail() {
 async fn test_claim_fail_user_not_owner() {
     let mut interact = ContractInteract::new().await;
 
-    let deadline = calculate_reachable_deadline();
+    let deadline = get_unix_timestamp() + 25;
 
     interact
         .upgrade(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
@@ -602,7 +601,7 @@ async fn test_claim_fail_user_not_owner() {
 async fn test_claim_owner() {
     let mut interact = ContractInteract::new().await;
 
-    let deadline = calculate_reachable_deadline();
+    let deadline = get_unix_timestamp() + 25;
     interact
         .upgrade(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
         .await;
@@ -620,42 +619,97 @@ async fn test_claim_owner() {
 async fn test_target_not_achieved_user_claim() {
     let mut interact = ContractInteract::new().await;
 
-    let deadline = calculate_reachable_deadline();
+    let deadline = get_unix_timestamp() + 25;
 
     interact
         .upgrade(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
         .await;
 
     interact
-        .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Dan)
+        .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Frank)
         .await;
 
     wait_past_deadline(deadline);
 
-    interact.claim(AddressType::Dan).await;
+    interact.claim(AddressType::Frank).await;
 }
 
 #[tokio::test]
-async fn test_already_claimed_funds() {
+async fn test_multiple_funds() {
     let mut interact = ContractInteract::new().await;
 
-    let deadline = calculate_reachable_deadline();
+    let deadline = get_unix_timestamp() + 120;
 
     interact
-        .upgrade(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
+        .deploy(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
         .await;
 
-    interact
-        .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Dan)
-        .await;
+    for _ in 0..5 {
+        interact
+            .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Dan)
+            .await;
+    }
+
+    for _ in 0..5 {
+        interact
+            .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Frank)
+            .await;
+    }
 
     wait_past_deadline(deadline);
 
     interact.claim(AddressType::Dan).await;
-    sleep(Duration::from_secs(5));
+    interact.claim(AddressType::Frank).await;
+}
+
+#[tokio::test]
+async fn test_status_funding() {
+    let mut interact = ContractInteract::new().await;
+
     interact
-        .claim_fail(ExpectError(4, "insufficient funds"), AddressType::Dan)
+        .deploy(TARGET_UNREACHABLE, DEADLINE_CONTRACT, TOKEN_IDENTIFIER)
         .await;
+
+    let status = interact.status().await;
+    assert_eq!(status, proxy::Status::FundingPeriod);
+}
+
+#[tokio::test]
+async fn test_status_succ() {
+    let mut interact = ContractInteract::new().await;
+    let deadline = get_unix_timestamp() + 30;
+    interact
+        .deploy(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
+        .await;
+    interact
+        .fund(
+            TOKEN_IDENTIFIER,
+            0,
+            TARGET_CONTRACT + 10000000000,
+            AddressType::Dan,
+        )
+        .await;
+
+    wait_past_deadline(deadline + 40);
+
+    let status = interact.status().await;
+    assert_eq!(status, proxy::Status::Successful);
+}
+
+#[tokio::test]
+async fn test_status_failed() {
+    let mut interact = ContractInteract::new().await;
+    let deadline = get_unix_timestamp() + 30;
+    interact
+        .deploy(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
+        .await;
+    interact
+        .fund(TOKEN_IDENTIFIER, 0, TARGET_CONTRACT, AddressType::Dan)
+        .await;
+    wait_past_deadline(deadline + 40);
+
+    let status = interact.status().await;
+    assert_eq!(status, proxy::Status::Failed);
 }
 
 #[tokio::test]
