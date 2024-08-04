@@ -145,9 +145,6 @@ impl ContractInteract {
     }
 
     async fn deploy(&mut self, target: u128, deadline: u64, token_identifier: &str) {
-        // let target = BigUint::<StaticApi>::from(target);
-        // let token_identifier = EgldOrEsdtTokenIdentifier::esdt(token_identifier);
-
         let new_address = self
             .interactor
             .tx()
@@ -173,9 +170,6 @@ impl ContractInteract {
     }
 
     async fn upgrade(&mut self, target: u128, deadline: u64, token_identifier: &str) {
-        // let target = BigUint::<StaticApi>::from(target);
-        // let token_identifier = EgldOrEsdtTokenIdentifier::esdt(token_identifier);
-
         self.interactor
             .tx()
             .from(&self.owner_address)
@@ -248,8 +242,6 @@ impl ContractInteract {
     }
 
     async fn fund_egld_failed(&mut self, token_amount: u128, expected_result: ExpectError<'_>) {
-        ////////////
-
         let response = self
             .interactor
             .tx()
@@ -274,7 +266,6 @@ impl ContractInteract {
         token_amount: u128,
         expected_result: ExpectError<'_>,
     ) {
-        ////////////
         let response = self
             .interactor
             .tx()
@@ -920,12 +911,3 @@ async fn fund_token_past_deadline() {
         .await;
 }
 
-// OTHER TESTS
-
-#[tokio::test]
-async fn fund_nft() {
-    let mut interact = ContractInteract::new().await;
-    interact
-        .fund(TOKEN_ID_TTO, 1, TOKEN_AMOUNT, AddressType::Dan)
-        .await;
-}
