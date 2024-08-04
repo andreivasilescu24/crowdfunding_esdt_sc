@@ -1,0 +1,47 @@
+{
+    "steps": [
+        {
+            "step": "setState",
+            "newAddresses": [
+                {
+                    "creatorAddress": "address:owner",
+                    "creatorNonce": "0",
+                    "newAddress": "sc:crowdfunding-esdt"
+                }
+            ]
+        },
+        {
+            "step": "scDeploy",
+            "id": "",
+            "tx": {
+                "from": "address:owner",
+                "contractCode": "mxsc:output/crowdfunding-esdt.mxsc.json",
+                "arguments": [
+                    "0x64",
+                    "0x67441b14",
+                    "0x54544f2d323831646566"
+                ],
+                "gasLimit": "5,000,000"
+            },
+            "expect": {
+                "out": [],
+                "status": "0"
+            }
+        },
+        {
+            "step": "scQuery",
+            "id": "",
+            "tx": {
+                "to": "sc:crowdfunding-esdt",
+                "function": "status",
+                "arguments": []
+            },
+            "expect": {
+                "out": [
+                    "0x"
+                ],
+                "status": "0"
+            }
+        }
+    ]
+}
