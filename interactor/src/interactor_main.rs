@@ -668,7 +668,7 @@ async fn test_status_funding() {
 #[tokio::test]
 async fn test_status_succ() {
     let mut interact = ContractInteract::new().await;
-    let deadline = get_unix_timestamp() + 30;
+    let deadline = get_unix_timestamp() + 20;
     interact
         .deploy(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
         .await;
@@ -690,7 +690,7 @@ async fn test_status_succ() {
 #[tokio::test]
 async fn test_status_failed() {
     let mut interact = ContractInteract::new().await;
-    let deadline = get_unix_timestamp() + 30;
+    let deadline = get_unix_timestamp() + 20;
     interact
         .deploy(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
         .await;
@@ -782,6 +782,12 @@ async fn fund_egld_wrong_token() {
 #[tokio::test]
 async fn fund_egld_past_deadline() {
     let mut interact = ContractInteract::new().await;
+    let deadline = get_unix_timestamp() + 20;
+
+    interact.upgrade(TARGET, deadline, TOKEN_ID_EGLD).await;
+
+    wait_past_deadline(deadline);
+
     interact
         .fund_egld_failed(TOKEN_AMOUNT, ExpectError(4, "cannot fund after deadline"))
         .await;
@@ -901,6 +907,12 @@ async fn test_query_deposit() {
 #[tokio::test]
 async fn fund_token_past_deadline() {
     let mut interact = ContractInteract::new().await;
+    let deadline = get_unix_timestamp() + 20;
+
+    interact.upgrade(TARGET, deadline, TOKEN_ID_EGLD).await;
+
+    wait_past_deadline(deadline);
+
     interact
         .fund_failed(
             TOKEN_ID_TTO,
