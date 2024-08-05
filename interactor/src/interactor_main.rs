@@ -405,7 +405,7 @@ impl ContractInteract {
 
     async fn deploy_bad_parameters(
         &mut self,
-        target: BigUint<StaticApi>,
+        target: u128,
         deadline: u64,
         token_identifier: &str,
         expected_result: ExpectError<'_>,
@@ -415,7 +415,11 @@ impl ContractInteract {
             .from(&self.owner_address)
             .gas(NumExpr("30,000,000"))
             .typed(proxy::CrowdfundingProxy)
-            .init(target, deadline, TokenIdentifier::from(token_identifier))
+            .init(
+                BigUint::from(target),
+                deadline,
+                TokenIdentifier::from(token_identifier),
+            )
             .code(&self.contract_code)
             .returns(expected_result)
             .prepare_async()
@@ -548,6 +552,39 @@ async fn test_deploy() {
 }
 
 #[tokio::test]
+async fn test_deploy_bad_parameters() {
+    let mut interact = ContractInteract::new().await;
+    let deadline = get_unix_timestamp() - 20;
+
+    interact
+        .deploy_bad_parameters(
+            TARGET_CONTRACT,
+            deadline,
+            TOKEN_IDENTIFIER,
+            ExpectError(4, "Deadline can't be in the past"),
+        )
+        .await;
+
+    interact
+        .deploy_bad_parameters(
+            0,
+            DEADLINE_CONTRACT,
+            TOKEN_IDENTIFIER,
+            ExpectError(4, "Target must be more than 0"),
+        )
+        .await;
+
+    interact
+        .deploy_bad_parameters(
+            TARGET_CONTRACT,
+            DEADLINE_CONTRACT,
+            "TTO-12312313123131",
+            ExpectError(4, "Invalid token provided"),
+        )
+        .await;
+}
+
+#[tokio::test]
 async fn test_claim_deadline_fail() {
     let mut interact = ContractInteract::new().await;
     interact
@@ -561,6 +598,13 @@ async fn test_claim_deadline_fail() {
         .claim_fail(
             ExpectError(4, "cannot claim before deadline"),
             AddressType::Dan,
+        )
+        .await;
+
+    interact
+        .claim_fail(
+            ExpectError(4, "cannot claim before deadline"),
+            AddressType::Owner,
         )
         .await;
 }
@@ -594,7 +638,7 @@ async fn test_claim_owner() {
 
     let deadline = get_unix_timestamp() + 25;
     interact
-        .upgrade(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
+        .deploy(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
         .await;
 
     interact
@@ -819,6 +863,25 @@ async fn fund_wrong_token() {
 }
 
 #[tokio::test]
+async fn fund_token_past_deadline() {
+    let mut interact = ContractInteract::new().await;
+    let deadline = get_unix_timestamp() + 20;
+
+    interact.upgrade(TARGET, deadline, TOKEN_ID_EGLD).await;
+
+    wait_past_deadline(deadline);
+
+    interact
+        .fund_failed(
+            TOKEN_ID_TTO,
+            TOKEN_NONCE,
+            TOKEN_AMOUNT,
+            ExpectError(4, "cannot fund after deadline"),
+        )
+        .await;
+}
+
+#[tokio::test]
 async fn test_query_balance() {
     let mut interact = ContractInteract::new().await;
 
@@ -902,23 +965,4 @@ async fn test_query_deposit() {
         "Deposited amount should be {:?}",
         token_amount
     );
-}
-
-#[tokio::test]
-async fn fund_token_past_deadline() {
-    let mut interact = ContractInteract::new().await;
-    let deadline = get_unix_timestamp() + 20;
-
-    interact.upgrade(TARGET, deadline, TOKEN_ID_EGLD).await;
-
-    wait_past_deadline(deadline);
-
-    interact
-        .fund_failed(
-            TOKEN_ID_TTO,
-            TOKEN_NONCE,
-            TOKEN_AMOUNT,
-            ExpectError(4, "cannot fund after deadline"),
-        )
-        .await;
 }
