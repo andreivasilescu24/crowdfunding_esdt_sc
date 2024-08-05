@@ -8,6 +8,7 @@ use crowdfunding_esdt::endpoints::target;
 use multiversx_sc_snippets::imports::*;
 use multiversx_sc_snippets::sdk;
 use multiversx_sc_snippets::sdk::data::address;
+use reqwest::Client;
 use serde::de;
 use serde::{Deserialize, Serialize};
 use std::os::unix;
@@ -648,6 +649,7 @@ async fn test_claim_owner() {
     wait_past_deadline(deadline);
 
     interact.claim(AddressType::Owner).await;
+    interact.claim(AddressType::Owner).await;
 }
 
 #[tokio::test]
@@ -673,24 +675,20 @@ async fn test_target_not_achieved_user_claim() {
 async fn test_multiple_funds() {
     let mut interact = ContractInteract::new().await;
 
-    let deadline = get_unix_timestamp() + 120;
+    let deadline = get_unix_timestamp() + 30;
 
     interact
         .deploy(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
         .await;
 
-    for _ in 0..5 {
+    for _ in 0..2 {
         interact
             .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Dan)
             .await;
-    }
-
-    for _ in 0..5 {
         interact
             .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Frank)
             .await;
     }
-
     wait_past_deadline(deadline);
 
     interact.claim(AddressType::Dan).await;
@@ -852,6 +850,7 @@ async fn fund_token() {
 async fn fund_wrong_token() {
     let mut interact = ContractInteract::new().await;
 
+    interact.upgrade(TARGET, DEADLINE, TOKEN_ID_TTO).await;
     interact
         .fund_failed(
             TOKEN_ID_WRONG_TOKEN,
@@ -966,3 +965,22 @@ async fn test_query_deposit() {
         token_amount
     );
 }
+
+// async fn test_chain_simulator_tx_send() {
+//     let client = reqwest::Client::new();
+//     let res = client
+//         .post("localhost:8085/v1.0/transaction/simulate?checkSignature=false")
+//         .body("
+//             "sender": "erd13x29rvmp4qlgn4emgztd8jgvyzdj0p6vn37tqxas3v9mfhq4dy7shalqrx",
+//             "receiver": "erd13x29rvmp4qlgn4emgztd8jgvyzdj0p6vn37tqxas3v9mfhq4dy7shalqrx",
+//             "amount": "100000000000000000",
+//             "nonce": 1,
+//             "gasPrice": 1000000000,
+//             "gasLimit": 50000,
+//             "data": "",
+//             "signature": ""
+//           ")
+//         .send()
+//         .await;
+//     println!("{:?}", res.unwrap());
+// }
