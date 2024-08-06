@@ -62,7 +62,6 @@ pub trait Crowdfunding {
     #[view(getCurrentFunds)]
     fn get_current_funds(&self) -> BigUint {
         let token = self.cf_token_identifier().get();
-
         self.blockchain().get_sc_balance(&token, 0)
     }
 
