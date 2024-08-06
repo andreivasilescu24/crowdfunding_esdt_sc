@@ -2,3 +2,5 @@
 [[proxy]]
 path = "interactor/src/proxy.rs"
  
+[[proxy]]
+path = "tests/proxy.rs"
