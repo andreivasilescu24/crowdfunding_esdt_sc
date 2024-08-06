@@ -145,7 +145,7 @@ impl ContractInteract {
         }
     }
 
-    async fn deploy(&mut self, target: u128, deadline: u64, token_identifier: &str) {
+    async fn deploy_succ(&mut self, target: u128, deadline: u64, token_identifier: &str) {
         let new_address = self
             .interactor
             .tx()
@@ -191,7 +191,7 @@ impl ContractInteract {
         println!("upgrade completed");
     }
 
-    async fn fund_egld(&mut self, token_amount: u128) {
+    async fn fund_egld_succ(&mut self, token_amount: u128) {
         let response = self
             .interactor
             .tx()
@@ -209,7 +209,7 @@ impl ContractInteract {
         println!("Result: {response:?}");
     }
 
-    async fn fund(
+    async fn fund_succ(
         &mut self,
         token_id: &str,
         token_nonce: u64,
@@ -304,7 +304,7 @@ impl ContractInteract {
         BigUint::from(result_value)
     }
 
-    async fn claim(&mut self, address_type: AddressType) {
+    async fn claim_succ(&mut self, address_type: AddressType) {
         let sender_addr: &Address = match address_type {
             AddressType::Dan => &self.dan_address,
             AddressType::Frank => &self.frank_address,
@@ -548,7 +548,7 @@ async fn test_deploy() {
     let deadline = DEADLINE_CONTRACT;
     let token_identifier = TOKEN_IDENTIFIER;
     interact
-        .deploy(TARGET_CONTRACT, deadline, token_identifier)
+        .deploy_succ(TARGET_CONTRACT, deadline, token_identifier)
         .await;
 }
 
@@ -592,7 +592,7 @@ async fn test_claim_deadline_fail() {
         .upgrade(TARGET_CONTRACT, DEADLINE_CONTRACT, TOKEN_IDENTIFIER)
         .await;
     interact
-        .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Dan)
+        .fund_succ(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Dan)
         .await;
 
     interact
@@ -620,7 +620,7 @@ async fn test_claim_fail_user_not_owner() {
         .upgrade(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
         .await;
     interact
-        .fund(TOKEN_IDENTIFIER, 0, TARGET_CONTRACT, AddressType::Dan)
+        .fund_succ(TOKEN_IDENTIFIER, 0, TARGET_CONTRACT, AddressType::Dan)
         .await;
 
     wait_past_deadline(deadline);
@@ -639,17 +639,17 @@ async fn test_claim_owner() {
 
     let deadline = get_unix_timestamp() + 25;
     interact
-        .deploy(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
+        .deploy_succ(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
         .await;
 
     interact
-        .fund(TOKEN_IDENTIFIER, 0, TARGET_CONTRACT, AddressType::Dan)
+        .fund_succ(TOKEN_IDENTIFIER, 0, TARGET_CONTRACT, AddressType::Dan)
         .await;
 
     wait_past_deadline(deadline);
 
-    interact.claim(AddressType::Owner).await;
-    interact.claim(AddressType::Owner).await;
+    interact.claim_succ(AddressType::Owner).await;
+    interact.claim_succ(AddressType::Owner).await;
 }
 
 #[tokio::test]
@@ -663,12 +663,12 @@ async fn test_target_not_achieved_user_claim() {
         .await;
 
     interact
-        .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Frank)
+        .fund_succ(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Frank)
         .await;
 
     wait_past_deadline(deadline);
 
-    interact.claim(AddressType::Frank).await;
+    interact.claim_succ(AddressType::Frank).await;
 }
 
 #[tokio::test]
@@ -678,21 +678,21 @@ async fn test_multiple_funds() {
     let deadline = get_unix_timestamp() + 30;
 
     interact
-        .deploy(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
+        .deploy_succ(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
         .await;
 
     for _ in 0..2 {
         interact
-            .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Dan)
+            .fund_succ(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Dan)
             .await;
         interact
-            .fund(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Frank)
+            .fund_succ(TOKEN_IDENTIFIER, 0, TOKEN_LOW_AMOUNT, AddressType::Frank)
             .await;
     }
     wait_past_deadline(deadline);
 
-    interact.claim(AddressType::Dan).await;
-    interact.claim(AddressType::Frank).await;
+    interact.claim_succ(AddressType::Dan).await;
+    interact.claim_succ(AddressType::Frank).await;
 }
 
 #[tokio::test]
@@ -700,7 +700,7 @@ async fn test_status_funding() {
     let mut interact = ContractInteract::new().await;
 
     interact
-        .deploy(TARGET_UNREACHABLE, DEADLINE_CONTRACT, TOKEN_IDENTIFIER)
+        .deploy_succ(TARGET_UNREACHABLE, DEADLINE_CONTRACT, TOKEN_IDENTIFIER)
         .await;
 
     let status = interact.status().await;
@@ -712,10 +712,10 @@ async fn test_status_succ() {
     let mut interact = ContractInteract::new().await;
     let deadline = get_unix_timestamp() + 20;
     interact
-        .deploy(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
+        .deploy_succ(TARGET_CONTRACT, deadline, TOKEN_IDENTIFIER)
         .await;
     interact
-        .fund(
+        .fund_succ(
             TOKEN_IDENTIFIER,
             0,
             TARGET_CONTRACT + 10000000000,
@@ -734,10 +734,10 @@ async fn test_status_failed() {
     let mut interact = ContractInteract::new().await;
     let deadline = get_unix_timestamp() + 20;
     interact
-        .deploy(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
+        .deploy_succ(TARGET_UNREACHABLE, deadline, TOKEN_IDENTIFIER)
         .await;
     interact
-        .fund(TOKEN_IDENTIFIER, 0, TARGET_CONTRACT, AddressType::Dan)
+        .fund_succ(TOKEN_IDENTIFIER, 0, TARGET_CONTRACT, AddressType::Dan)
         .await;
     wait_past_deadline(deadline + 40);
 
@@ -780,7 +780,7 @@ async fn test_deploy_egld() {
     let deadline = 1732516628u64;
     interact.upgrade(target, deadline, TOKEN_IDENTIFIER).await;
     interact
-        .fund(
+        .fund_succ(
             TOKEN_IDENTIFIER,
             token_nonce,
             token_amount,
@@ -789,7 +789,7 @@ async fn test_deploy_egld() {
         .await;
 
     interact
-        .deploy(target, get_unix_timestamp() + 10, TOKEN_ID_EGLD)
+        .deploy_succ(target, get_unix_timestamp() + 10, TOKEN_ID_EGLD)
         .await;
 }
 
@@ -798,7 +798,7 @@ async fn test_deploy_token() {
     let mut interact = ContractInteract::new().await;
     let target = 5u128;
     interact
-        .deploy(target, get_unix_timestamp() + 10, TOKEN_ID_TTO)
+        .deploy_succ(target, get_unix_timestamp() + 10, TOKEN_ID_TTO)
         .await;
 }
 
@@ -808,7 +808,7 @@ async fn fund_egld() {
     let mut interact = ContractInteract::new().await;
 
     interact.upgrade(TARGET, DEADLINE, TOKEN_ID_EGLD).await;
-    interact.fund_egld(TOKEN_AMOUNT).await;
+    interact.fund_egld_succ(TOKEN_AMOUNT).await;
 }
 
 #[tokio::test]
@@ -842,7 +842,7 @@ async fn fund_token() {
 
     interact.upgrade(TARGET, DEADLINE, TOKEN_ID_TTO).await;
     interact
-        .fund(TOKEN_ID_TTO, TOKEN_NONCE, TOKEN_AMOUNT, AddressType::Dan)
+        .fund_succ(TOKEN_ID_TTO, TOKEN_NONCE, TOKEN_AMOUNT, AddressType::Dan)
         .await;
 }
 
@@ -888,7 +888,7 @@ async fn test_query_balance() {
     let deadline = 1732516628u64;
     let token_identifier: &str = "TTO-281def";
     interact
-        .deploy(TARGET_CONTRACT, deadline, token_identifier)
+        .deploy_succ(TARGET_CONTRACT, deadline, token_identifier)
         .await;
 
     // Check balance 0
@@ -905,7 +905,7 @@ async fn test_query_balance() {
     let token_amount1 = 500000000000000000u128;
     let token_amount2 = 600000000000000000u128;
     interact
-        .fund(
+        .fund_succ(
             token_identifier,
             token_nonce,
             token_amount1,
@@ -914,7 +914,7 @@ async fn test_query_balance() {
         .await;
 
     interact
-        .fund(
+        .fund_succ(
             token_identifier,
             token_nonce,
             token_amount2,
@@ -946,7 +946,7 @@ async fn test_query_deposit() {
     let token_nonce = 0u64;
     let token_amount = 500000000000000000u128;
     interact
-        .fund(
+        .fund_succ(
             TOKEN_IDENTIFIER,
             token_nonce,
             token_amount,
